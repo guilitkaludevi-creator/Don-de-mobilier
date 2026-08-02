@@ -330,6 +330,19 @@
       .mov{align-items:flex-end;padding:0}.modal{border-radius:var(--r) var(--r) 0 0;max-height:80vh}
     }
     @media(max-width:500px){.gc{grid-template-columns:1fr}.imetrics{gap:18px}.atabs{width:100%}}
+
+    /* PROGRESS BAR */
+    .progress-container { width: 100%; margin-bottom: 24px; padding: 20px; background: var(--bg-card); border-radius: var(--r); border: 1px solid var(--border); }
+    .progress-steps { display: flex; justify-content: space-between; position: relative; max-width: 600px; margin: 0 auto; }
+    .progress-steps::before { content: ''; position: absolute; top: 14px; left: 15px; right: 15px; height: 4px; background: rgba(255,255,255,0.06); z-index: 1; border-radius: 4px; }
+    .progress-bar-fill { position: absolute; top: 14px; left: 15px; height: 4px; background: linear-gradient(90deg, var(--primary), var(--primary-d)); z-index: 2; transition: width .4s ease; border-radius: 4px; box-shadow: 0 0 10px var(--primary-glow); }
+    .step { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 60px; }
+    .step-dot { width: 32px; height: 32px; border-radius: 50%; background: #152535; border: 3px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--txt3); transition: var(--t); }
+    .step.active .step-dot { border-color: var(--primary); background: var(--primary); color: #fff; box-shadow: 0 0 15px rgba(0,212,160,0.4); }
+    .step.done .step-dot { border-color: var(--primary); background: var(--primary); color: #fff; }
+    .step-lbl { font-size: 11px; font-weight: 600; color: var(--txt3); text-align: center; white-space: nowrap; }
+    .step.active .step-lbl, .step.done .step-lbl { color: var(--txt); }
+
   </style>
 </head>
 <body>
@@ -728,6 +741,35 @@ async function initSettings(){
   document.getElementById('set-service').value=S.profile?.service||'';
   document.getElementById('set-err1').classList.add('hidden');
   document.getElementById('set-err2').classList.add('hidden');
+  if(S.profile?.role==='admin'){
+    document.getElementById('admin-users-card').style.display='block';
+    loadAdminUsers();
+  } else {
+    document.getElementById('admin-users-card').style.display='none';
+  }
+}
+async function loadAdminUsers(){
+  const tb=document.getElementById('tbl-users');
+  tb.innerHTML='<tr><td colspan="5" style="text-align:center">Chargement...</td></tr>';
+  try{
+    const snap=await db.collection('users').get();
+    const usrs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    tb.innerHTML=usrs.map(u=>`<tr>
+      <td class="tm">${esc(u.displayName)}</td>
+      <td>${esc(u.email)}</td>
+      <td>${esc(u.centre||'-')}</td>
+      <td>${u.isBlacklisted?'<span style="color:var(--danger)">Bloqué</span>':'<span style="color:var(--primary)">Actif</span>'}</td>
+      <td><button class="btn ${u.isBlacklisted?'btn-info':'btn-danger'} btn-sm" onclick="toggleBlacklist('${u.id}', ${!u.isBlacklisted})">${u.isBlacklisted?'Débloquer':'Bloquer'}</button></td>
+    </tr>`).join('');
+  }catch(e){ tb.innerHTML=`<tr><td colspan="5" style="color:var(--danger)">Erreur: ${esc(e.message)}</td></tr>`; }
+}
+async function toggleBlacklist(uid, block){
+  if(!confirm(`Voulez-vous vraiment ${block?'bloquer':'débloquer'} cet utilisateur ?`)) return;
+  try{
+    await db.collection('users').doc(uid).update({isBlacklisted:block});
+    toast(`Utilisateur ${block?'bloqué':'débloqué'}.`,'success');
+    loadAdminUsers();
+  }catch(e){ toast(`Erreur: ${e.message}`,'error'); }
 }
 async function handleUpdateProfile(){
   const p=document.getElementById('set-prenom').value.trim();
@@ -886,16 +928,68 @@ async function loadDetail(id){
     renderDetail(a,iSnap.docs.map(d=>({id:d.id,...d.data()})));
   }catch(e){el.innerHTML=`<div class="empty"><div class="eico">❌</div><div class="etitle">Erreur</div><div class="etxt">${esc(e.message)}</div></div>`}
 }
+
+function buildProgressBar(statut, isDemande) {
+  let steps = [];
+  let pct = 0;
+  if (isDemande) {
+    steps = [
+      {id: 'en_attente', lbl: 'Recherche', icon: '🔍'},
+      {id: 'satisfaite', lbl: 'Satisfaite', icon: '✅'}
+    ];
+    if(statut === 'en_attente') pct = 0;
+    if(statut === 'satisfaite') pct = 100;
+  } else {
+    steps = [
+      {id: 'en_attente', lbl: 'En attente', icon: '⏳'},
+      {id: 'disponible', lbl: 'En ligne', icon: '📋'},
+      {id: 'reserve', lbl: 'Réservé', icon: '🚚'},
+      {id: 'donne', lbl: 'Livré / Donné', icon: '🤝'}
+    ];
+    if(statut === 'en_attente') pct = 0;
+    if(statut === 'disponible') pct = 33;
+    if(statut === 'reserve') pct = 66;
+    if(statut === 'donne' || statut === 'oriente') pct = 100;
+    if(statut === 'non_reclame') return '<div class="alert alert-danger" style="margin-bottom:20px">Objet non réclamé (échéance dépassée).</div>';
+  }
+  
+  const stepHTML = steps.map(s => {
+    let state = '';
+    const sIndex = steps.findIndex(x=>x.id===s.id);
+    const cIndex = steps.findIndex(x=>x.id===(statut==='oriente'?'donne':statut));
+    if(cIndex === sIndex) state = 'active';
+    else if(cIndex > sIndex) state = 'done';
+    
+    return `<div class="step ${state}">
+      <div class="step-dot">${state==='done'?'✓':s.icon}</div>
+      <div class="step-lbl">${s.lbl}</div>
+    </div>`;
+  }).join('');
+  
+  return `
+    <div class="progress-container">
+      <div class="stitle" style="margin-bottom:15px; font-size:13px; color:var(--txt2)">Suivi de l'objet</div>
+      <div class="progress-steps">
+        <div class="progress-bar-fill" style="width: ${pct}%"></div>
+        ${stepHTML}
+      </div>
+    </div>
+  `;
+}
+
 function renderDetail(a,ints){
-  const isOwner=S.user?.uid===a.deposantId;
+  const isOwner=S.user?.uid===a.deposantId || S.user?.uid===a.demandeurId;
   const isAdmin=S.profile?.role==='admin';
   const alreadyInt=ints.some(i=>i.userId===S.user?.uid);
-  const canInt=a.statut==='disponible'&&!isOwner&&!alreadyInt;
+  const canInt=a.statut==='disponible'&&!isOwner&&!alreadyInt && !a.demandeurId;
   const photos=a.photos?.length?a.photos:null;
   const co2=co2e(a.type,a.etat),val=vale(a.type,a.etat);
+  const isDemande = !!a.demandeurId;
+  const pbHTML = buildProgressBar(a.statut, isDemande);
   const el=document.getElementById('detail-c');
   el.innerHTML=`
-    <button class="btn btn-secondary btn-sm" onclick="go('catalog')" style="margin-bottom:18px">← Retour au catalogue</button>
+    <button class="btn btn-secondary btn-sm" onclick="go('catalog')" style="margin-bottom:18px">← Retour</button>
+    ${pbHTML}
     <div class="dg">
       <div>
         <div class="dphotos card mb16">
@@ -994,6 +1088,11 @@ async function handleSubmitPost(){
   const mode=document.querySelector('input[name="pmode"]:checked').value;
   const err=document.getElementById('perr'),btn=document.getElementById('pbtn');
   err.classList.add('hidden');
+  if(S.profile?.isBlacklisted) {
+    err.textContent = "Votre compte a été bloqué par un administrateur. Vous ne pouvez plus déposer d'annonces ou de demandes.";
+    err.classList.remove('hidden');
+    return;
+  }
   if(mode==='donne'){
     const titre=document.getElementById('ptit').value.trim(),type=document.getElementById('ptyp').value;
     const etat=document.getElementById('peta').value,desc=document.getElementById('pdesc').value.trim();
