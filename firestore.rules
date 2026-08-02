@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /annonces/{annonceId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        resource.data.deposantId == request.auth.uid ||
+        get(/databases//documents/users/).data.role == 'admin'
+      );
+      allow delete: if request.auth != null && (
+        resource.data.deposantId == request.auth.uid ||
+        get(/databases//documents/users/).data.role == 'admin'
+      );
+    }
+    match /interets/{interetId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    match /demandes/{demandeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && (
+        resource.data.demandeurId == request.auth.uid ||
+        get(/databases//documents/users/).data.role == 'admin'
+      );
+    }
+    match /notifications/{notifId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+  }
+}
