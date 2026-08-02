@@ -391,9 +391,12 @@
         <div id="ls">
           <h2 class="lft1">Connexion</h2><p class="lfs">Accédez à votre espace collaborateur</p>
           <div id="lerr" class="alert alert-danger hidden"></div>
-          <div class="fg"><label class="fl" for="le">Email professionnel</label><input type="email" id="le" class="fi" placeholder="prenom.nom@fsjd.fr" autocomplete="email"></div>
-          <div class="fg"><label class="fl" for="lp">Mot de passe</label><input type="password" id="lp" class="fi" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')handleLogin()"></div>
-          <button class="btn btn-primary btn-full btn-lg" id="lbtn" onclick="handleLogin()">Se connecter</button>
+          <form onsubmit="event.preventDefault(); handleLogin();">
+            <div class="fg"><label class="fl" for="le">Email professionnel</label><input type="email" id="le" class="fi" placeholder="prenom.nom@fsjd.fr" autocomplete="username" required></div>
+            <div class="fg"><label class="fl" for="lp">Mot de passe</label><input type="password" id="lp" class="fi" placeholder="••••••••" autocomplete="current-password" required></div>
+            <button type="submit" class="btn btn-primary btn-full btn-lg" id="lbtn">Se connecter</button>
+            <div class="auth-tog" style="margin-top:12px;margin-bottom:20px"><a onclick="handleForgot()">Mot de passe oublié ?</a></div>
+          </form>
           <div class="auth-tog">Pas encore de compte ? <a onclick="showSec('reg')">Créer un compte</a></div>
         </div>
         <div id="rs" class="hidden">
@@ -670,6 +673,7 @@ function go(view,params={}){
   else if(view==='admin-moderate')loadMod();
   else if(view==='admin-dashboard')loadDash();
   else if(view==='detail'&&params.id)loadDetail(params.id);
+  else if(view==='settings')initSettings();
 }
 
 // AUTH
@@ -704,6 +708,67 @@ async function handleRegister(){
 }
 async function handleLogout(){await auth.signOut();toast('Déconnecté.','info')}
 
+
+async function handleForgot(){
+  const email=document.getElementById('le').value.trim();
+  const err=document.getElementById('lerr');
+  if(!email){err.textContent="Veuillez saisir votre e-mail ci-dessus puis cliquer sur Mot de passe oublié.";err.classList.remove('hidden');return;}
+  try{
+    await auth.sendPasswordResetEmail(email);
+    toast("Un e-mail de réinitialisation a été envoyé à "+email,"success",6000);
+    err.classList.add('hidden');
+  }catch(e){
+    err.textContent=e.message; err.classList.remove('hidden');
+  }
+}
+async function initSettings(){
+  document.getElementById('set-prenom').value=S.profile?.prenom||'';
+  document.getElementById('set-nom').value=S.profile?.nom||'';
+  document.getElementById('set-centre').value=S.profile?.centre||'';
+  document.getElementById('set-service').value=S.profile?.service||'';
+  document.getElementById('set-err1').classList.add('hidden');
+  document.getElementById('set-err2').classList.add('hidden');
+}
+async function handleUpdateProfile(){
+  const p=document.getElementById('set-prenom').value.trim();
+  const n=document.getElementById('set-nom').value.trim();
+  const btn=document.getElementById('set-btn1');
+  const err=document.getElementById('set-err1');
+  btn.disabled=true; err.classList.add('hidden');
+  try{
+    const dn=p+' '+n;
+    await S.user.updateProfile({displayName:dn});
+    await db.collection('users').doc(S.user.uid).update({prenom:p,nom:n,displayName:dn});
+    if(S.profile){S.profile.prenom=p;S.profile.nom=n;S.profile.displayName=dn;}
+    document.getElementById('uname').textContent=dn;
+    document.getElementById('uinit').textContent=ini(dn);
+    toast("Profil mis à jour","success");
+  }catch(e){
+    err.textContent=e.message; err.classList.remove('hidden');
+  }
+  btn.disabled=false;
+}
+async function handleUpdatePwd(){
+  const p1=document.getElementById('set-pwd1').value;
+  const p2=document.getElementById('set-pwd2').value;
+  const err=document.getElementById('set-err2');
+  const btn=document.getElementById('set-btn2');
+  if(p1!==p2){err.textContent="Les mots de passe ne correspondent pas."; err.classList.remove('hidden'); return;}
+  if(p1.length<8){err.textContent="Mot de passe trop court."; err.classList.remove('hidden'); return;}
+  btn.disabled=true; err.classList.add('hidden');
+  try{
+    await S.user.updatePassword(p1);
+    toast("Mot de passe mis à jour","success");
+    document.getElementById('set-pwd1').value='';
+    document.getElementById('set-pwd2').value='';
+  }catch(e){
+    if(e.code==='auth/requires-recent-login') err.textContent="Veuillez vous déconnecter et vous reconnecter pour changer votre mot de passe.";
+    else err.textContent=e.message;
+    err.classList.remove('hidden');
+  }
+  btn.disabled=false;
+}
+
 auth.onAuthStateChanged(async user=>{
   if(user){
     S.user=user;
@@ -734,6 +799,7 @@ function buildTabs(){
   const isAdmin=S.profile?.role==='admin';
   let tabs=[{view:'catalog',i:'📋',l:'Catalogue'},{view:'post',i:'➕',l:'Déposer'},{view:'my-posts',i:'📦',l:'Mes annonces'}];
   if(isAdmin){tabs.push({sep:true});tabs.push({view:'admin-moderate',i:'🛡️',l:'Modération'});tabs.push({view:'admin-dashboard',i:'📊',l:'Tableau de bord'});tabs.push({view:'admin-export',i:'📥',l:'Export'})}
+  tabs.push({sep:true}); tabs.push({view:'settings',i:'⚙️',l:'Paramètres'});
   document.getElementById('tabs').innerHTML=tabs.map(t=>t.sep?'<div class="tab-sep"></div>':`<button class="tab-btn" data-view="${t.view}" onclick="go('${t.view}')">${t.i} ${t.l}</button>`).join('');
 }
 
