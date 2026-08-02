@@ -586,6 +586,49 @@
     </div>
   </div>
 
+
+  <!-- SETTINGS VIEW -->
+  <div id="view-settings" class="view">
+    <div class="ph"><h1 class="ptitle">⚙️ Paramètres du compte</h1><p class="psub">Gérez vos informations et votre sécurité.</p></div>
+    <div class="chg" style="grid-template-columns: 1fr; max-width: 600px;">
+      
+      <div class="card"><div class="cb">
+        <h2 class="stitle">Informations personnelles</h2>
+        <form onsubmit="event.preventDefault(); handleUpdateProfile();">
+          <div id="set-err1" class="alert alert-danger hidden"></div>
+          <div class="frow">
+            <div class="fg"><label class="fl">Prénom</label><input type="text" id="set-prenom" class="fi" required></div>
+            <div class="fg"><label class="fl">Nom</label><input type="text" id="set-nom" class="fi" required></div>
+          </div>
+          <div class="fg"><label class="fl">Centre</label><input type="text" id="set-centre" class="fi" disabled></div>
+          <div class="fg"><label class="fl">Service</label><input type="text" id="set-service" class="fi" disabled></div>
+          <button type="submit" class="btn btn-primary mt16" id="set-btn1">Enregistrer les modifications</button>
+        </form>
+      </div></div>
+      
+      <div class="card"><div class="cb">
+        <h2 class="stitle">Sécurité</h2>
+        <form onsubmit="event.preventDefault(); handleUpdatePwd();">
+          <div id="set-err2" class="alert alert-danger hidden"></div>
+          <div class="fg"><label class="fl">Nouveau mot de passe</label><input type="password" id="set-pwd1" class="fi" placeholder="8 caractères minimum" autocomplete="new-password" required></div>
+          <div class="fg"><label class="fl">Confirmer le mot de passe</label><input type="password" id="set-pwd2" class="fi" autocomplete="new-password" required></div>
+          <button type="submit" class="btn btn-secondary mt16" id="set-btn2">Modifier le mot de passe</button>
+        </form>
+      </div></div>
+      
+      <div class="card" id="admin-users-card" style="display:none; margin-top:20px"><div class="cb">
+        <h2 class="stitle">Gestion des utilisateurs (Admin)</h2>
+        <div class="tw">
+          <table>
+            <thead><tr><th>Utilisateur</th><th>Email</th><th>Centre</th><th>Statut</th><th>Action</th></tr></thead>
+            <tbody id="tbl-users"></tbody>
+          </table>
+        </div>
+      </div></div>
+
+    </div>
+  </div>
+
 </main>
 
 <!-- MODALS -->
