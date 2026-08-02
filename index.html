@@ -758,6 +758,8 @@ async function handleRegister(){
     let role='collaborateur';
     if(code===ADMIN_CODE)role='admin';
     await db.collection('users').doc(cred.user.uid).set({email,displayName:`${prenom} ${nom}`,prenom,nom,centre,service:svc,role,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    if(S.profile) S.profile.role = role;
+    if(role==='admin') { buildTabs(); document.getElementById('admin-users-card').style.display='block'; loadAdminUsers(); }
     toast(`Bienvenue ${prenom} !`,'success');
   }catch(e){const m={'auth/email-already-in-use':'Cet email est déjà utilisé.','auth/weak-password':'Mot de passe trop faible.'};err.textContent=m[e.code]||e.message;err.classList.remove('hidden')}
   finally{btn.disabled=false;btn.classList.remove('btn-ld')}
@@ -791,11 +793,11 @@ async function initSettings(){
     document.getElementById('admin-users-card').style.display='none';
   }
 }
-async function loadAdminUsers(){
+function loadAdminUsers(){
   const tb=document.getElementById('tbl-users');
   tb.innerHTML='<tr><td colspan="5" style="text-align:center">Chargement...</td></tr>';
-  try{
-    const snap=await db.collection('users').get();
+  if(S.adminUsersUnsub) S.adminUsersUnsub();
+  S.adminUsersUnsub = db.collection('users').onSnapshot(snap=>{
     const usrs=snap.docs.map(d=>({id:d.id,...d.data()}));
     tb.innerHTML=usrs.map(u=>`<tr>
       <td class="tm">${esc(u.displayName)}</td>
@@ -804,14 +806,13 @@ async function loadAdminUsers(){
       <td>${u.isBlacklisted?'<span style="color:var(--danger)">Bloqué</span>':'<span style="color:var(--primary)">Actif</span>'}</td>
       <td><button class="btn ${u.isBlacklisted?'btn-info':'btn-danger'} btn-sm" onclick="toggleBlacklist('${u.id}', ${!u.isBlacklisted})">${u.isBlacklisted?'Débloquer':'Bloquer'}</button></td>
     </tr>`).join('');
-  }catch(e){ tb.innerHTML=`<tr><td colspan="5" style="color:var(--danger)">Erreur: ${esc(e.message)}</td></tr>`; }
+  }, e=>{ tb.innerHTML=`<tr><td colspan="5" style="color:var(--danger)">Erreur: ${esc(e.message)}</td></tr>`; });
 }
 async function toggleBlacklist(uid, block){
   if(!confirm(`Voulez-vous vraiment ${block?'bloquer':'débloquer'} cet utilisateur ?`)) return;
   try{
     await db.collection('users').doc(uid).update({isBlacklisted:block});
     toast(`Utilisateur ${block?'bloqué':'débloqué'}.`,'success');
-    loadAdminUsers();
   }catch(e){ toast(`Erreur: ${e.message}`,'error'); }
 }
 async function handleUpdateProfile(){
